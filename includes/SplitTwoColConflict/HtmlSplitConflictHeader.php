@@ -5,7 +5,7 @@ namespace TwoColConflict\SplitTwoColConflict;
 use Html;
 use Language;
 use Linker;
-use MediaWiki\Revision\RevisionRecord;
+use MediaWiki\Storage\RevisionStoreRecord;
 use Message;
 use User;
 use Wikimedia\Timestamp\ConvertibleTimestamp;
@@ -50,7 +50,7 @@ class HtmlSplitConflictHeader {
 	 * @param string $newEditSummary
 	 */
 	public function __construct(
-		RevisionRecord $revision,
+		RevisionStoreRecord $revision,
 		User $user,
 		Language $language,
 		$now,
@@ -91,7 +91,7 @@ class HtmlSplitConflictHeader {
 	}
 
 	private function buildCurrentVersionHeader() {
-		$comment = $this->revision->getComment( RevisionRecord::FOR_THIS_USER, $this->user );
+		$comment = $this->revision->getComment( RevisionStoreRecord::FOR_THIS_USER, $this->user );
 		$summary = $comment ? $comment->text : '';
 
 		return $this->buildVersionHeader(
