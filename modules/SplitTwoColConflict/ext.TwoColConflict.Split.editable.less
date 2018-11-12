@@ -1,0 +1,111 @@
+/* stylelint-disable no-descending-specificity */
+
+.mw-twocolconflict-split-editable {
+	.mw-twocolconflict-split-editor {
+		display: none;
+		border: 0;
+		margin: 0;
+		min-height: 7em;
+		outline: 0;
+		padding: 0;
+		resize: vertical;
+		overflow: auto;
+		-webkit-box-shadow: none;
+		-moz-box-shadow: none;
+		box-shadow: none;
+		background: transparent;
+		color: #000;
+	}
+
+	.mw-twocolconflict-split-editor:focus {
+		border: 0;
+	}
+
+	/* stylelint-disable-next-line selector-max-id */
+	#toolbar {
+		display: none;
+	}
+}
+
+.mw-twocolconflict-split-editing {
+	.mw-twocolconflict-split-selected,
+	.mw-twocolconflict-split-copy {
+		.mw-twocolconflict-split-editable {
+			.mw-twocolconflict-split-editor {
+				display: block;
+			}
+
+			.mw-twocolconflict-split-edit-button {
+				display: none;
+			}
+
+			.mw-twocolconflict-split-difftext {
+				display: none;
+			}
+
+			.mw-twocolconflict-split-save-button {
+				display: block;
+			}
+
+			.mw-twocolconflict-split-reset-button {
+				display: block;
+			}
+
+			.mw-twocolconflict-split-collapse-button {
+				display: none;
+			}
+		}
+	}
+
+	.mw-twocolconflict-split-column {
+		display: block;
+		overflow-wrap: break-word;
+		-moz-appearance: textfield-multiline;
+		-webkit-user-select: text;
+		font: medium '-moz-fixed';
+		font: '-webkit-small-control';
+		font-size: medium;
+		line-height: normal;
+		text-rendering: auto;
+		color: initial;
+		letter-spacing: normal;
+		word-spacing: normal;
+		text-transform: none;
+		text-indent: 0;
+		text-shadow: none;
+		text-align: start;
+	}
+}
+
+.client-nojs {
+	.mw-twocolconflict-split-editable {
+		.mw-twocolconflict-split-difftext {
+			display: none;
+		}
+
+		.mw-twocolconflict-split-editor {
+			display: block;
+			overflow: inherit;
+		}
+	}
+
+	.mw-twocolconflict-split-column {
+		display: block;
+		overflow-wrap: break-word;
+		-moz-appearance: textfield-multiline;
+		-webkit-appearance: textarea;
+		-webkit-user-select: text;
+		font: medium '-moz-fixed';
+		font: '-webkit-small-control';
+		font-size: medium;
+		line-height: normal;
+		text-rendering: auto;
+		color: initial;
+		letter-spacing: normal;
+		word-spacing: normal;
+		text-transform: none;
+		text-indent: 0;
+		text-shadow: none;
+		text-align: start;
+	}
+}

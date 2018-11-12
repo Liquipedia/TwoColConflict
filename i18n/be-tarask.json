@@ -1,0 +1,9 @@
+{
+	"@metadata": {
+		"authors": [
+			"Red Winged Duck"
+		]
+	},
+	"twocolconflict": "TwoColConflict",
+	"twocolconflict-desc": "Паказвае побач экраны з вэрсіямі для разьвязаньня канфлікту рэдагаваньня"
+}
