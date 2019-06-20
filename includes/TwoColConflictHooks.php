@@ -33,7 +33,7 @@ class TwoColConflictHooks {
 			return \BetaFeatures::isFeatureEnabled( $user, 'twocolconflict' );
 		}
 
-		return $user->getBoolOption( 'teamliquidintegration-enable-beta-features' );
+		return true;
 	}
 
 	private static function shouldUseSplitInterface( WebRequest $request ) {
