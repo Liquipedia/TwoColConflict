@@ -1,4 +1,4 @@
-( function ( mw, $ ) {
+( function () {
 	'use strict';
 
 	/**
@@ -21,7 +21,7 @@
 	}
 
 	/**
-	 * @return {String}
+	 * @return {string}
 	 */
 	function getEditorFontClass() {
 		return $( '.mw-twocolconflict-split-editor' ).attr( 'class' )
@@ -46,25 +46,16 @@
 	 */
 	function enableEditing( $row ) {
 		var $selected = $row.find( '.mw-twocolconflict-split-selected, .mw-twocolconflict-split-copy' ),
-			maxHeight = Math.min(
-				// Keep the current height of the column, but not when it spans multiple screens
-				$selected.find( '.mw-twocolconflict-split-editable' ).height(),
-				window.innerHeight
-			);
+			originalHeight = $selected.find( '.mw-twocolconflict-split-editable' ).height();
 
 		expandText( $row );
 		$row.addClass( 'mw-twocolconflict-split-editing' );
+		$row.find( '.mw-twocolconflict-split-editable' ).addClass( getEditorFontClass() );
 
-		// Measure the two monospaced columns again *after* switching to editing mode
-		$row.find( '.mw-twocolconflict-split-editable' )
-			.addClass( getEditorFontClass() )
-			.each( function () {
-				maxHeight = Math.max( maxHeight, $( this ).height() );
-			} );
-		$row.find( 'textarea' ).each( function () {
+		$selected.find( 'textarea' ).each( function () {
 			var $editor = $( this );
-			if ( $editor.height() < maxHeight ) {
-				$editor.height( maxHeight );
+			if ( $editor.height() < originalHeight ) {
+				$editor.height( originalHeight );
 			}
 		} );
 
@@ -130,6 +121,30 @@
 		} );
 	}
 
+	/**
+	 * @param {OO.ui.ButtonWidget} button
+	 */
+	function addDisabledEditButtonToolTip( button ) {
+		var popup = new OO.ui.PopupWidget( {
+			$content: $( '<p>' ).html( mw.msg( 'twocolconflict-split-disabled-edit-tooltip' ) ),
+			classes: [ 'mw-twocolconflict-split-disabled-edit-button-popup' ],
+			padded: true,
+			position: 'above'
+		} );
+
+		button.$element.append( popup.$element );
+		button.$element.on( {
+			mouseenter: function () {
+				if ( $( this ).attr( 'aria-disabled' ) === 'true' ) {
+					popup.toggle( true );
+				}
+			},
+			mouseleave: function () {
+				popup.toggle( false );
+			}
+		} );
+	}
+
 	function initButtonEvents() {
 		[
 			{ selector: '.mw-twocolconflict-split-edit-button', onclick: enableEditing },
@@ -145,6 +160,10 @@
 				widget.on( 'click', function () {
 					button.onclick( $row );
 				} );
+
+				if ( button.selector === '.mw-twocolconflict-split-edit-button' ) {
+					addDisabledEditButtonToolTip( widget );
+				}
 			} );
 		} );
 	}
@@ -217,10 +236,75 @@
 		}
 	}
 
+	function showPreview( $parsed ) {
+		$( '#wikiPreview' ).remove();
+		var $html = $( 'html' );
+		var arrow = $html.attr( 'dir' ) === 'rtl' ? '←' : '→';
+
+		var $note = $( '<div>' )
+			.addClass( 'previewnote' )
+			.append(
+				$( '<h2>' )
+					.attr( 'id', 'mw-previewheader' )
+					.append( mw.msg( 'preview' ) ),
+				$( '<p>' )
+					.addClass( 'warningbox' )
+					.append(
+						mw.msg( 'previewnote' ),
+						$( '<span>' )
+							.addClass( 'mw-continue-editing' )
+							.append(
+								$( '<a>' )
+									.attr( 'href', '#editform' )
+									.append( ' ' + arrow + mw.msg( 'continue-editing' ) )
+							)
+					)
+			);
+
+		var $content = $( '<div>' )
+			.addClass( 'mw-content-' + $html.attr( 'dir' ) )
+			.attr( 'dir', $html.attr( 'dir' ) )
+			.attr( 'lang', $html.attr( 'lang' ) )
+			.append( $parsed );
+
+		var $preview = $( '<div>' )
+			.attr( 'id', 'wikiPreview' )
+			.addClass( 'ontop' );
+
+		$( '#mw-content-text' ).prepend(
+			$preview.append( $note, $content )
+		);
+
+		$( 'html, body' ).animate( { scrollTop: $( '#top' ).offset().top }, 500 );
+	}
+
+	function initPreview() {
+		var api = new mw.Api();
+		if ( api ) {
+			OO.ui.infuse( $( '#wpPreviewWidget' ) )
+				.setDisabled( false );
+
+			$( '#wpPreview' )
+				.click( function ( e ) {
+					e.preventDefault();
+
+					api.parse(
+						mw.libs.twoColConflict.split.merger(
+							$( '.mw-twocolconflict-split-row' )
+						),
+						null
+					).done( function ( $html ) {
+						showPreview( $html );
+					} );
+				} );
+		}
+	}
+
 	$( function () {
 		initColumnSelection();
 		initButtonEvents();
+		initPreview();
 		initTour();
 	} );
 
-}( mediaWiki, jQuery ) );
+}() );

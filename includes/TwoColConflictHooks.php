@@ -5,12 +5,10 @@ namespace TwoColConflict;
 use EditPage;
 use MediaWiki\MediaWikiServices;
 use OutputPage;
-use TwoColConflict\InlineTwoColConflict\InlineTwoColConflictHelper;
 use TwoColConflict\SpecialConflictTestPage\TwoColConflictTestEditPage;
 use TwoColConflict\SplitTwoColConflict\SplitConflictMerger;
 use TwoColConflict\SplitTwoColConflict\SplitTwoColConflictHelper;
 use User;
-use WebRequest;
 
 /**
  * Hook handlers for the TwoColConflict extension.
@@ -36,13 +34,6 @@ class TwoColConflictHooks {
 		return true;
 	}
 
-	private static function shouldUseSplitInterface( WebRequest $request ) {
-		$config = MediaWikiServices::getInstance()->getMainConfig();
-
-		return !$config->get( 'TwoColConflictUseInline' ) ||
-			$request->getCookie( 'mw-twocolconflict-split-ui', '' );
-	}
-
 	/**
 	 * @param EditPage $editPage
 	 */
@@ -57,35 +48,30 @@ class TwoColConflictHooks {
 			return;
 		}
 
-		if ( !self::shouldUseSplitInterface( $editPage->getContext()->getRequest() ) ) {
-			$editPage->setEditConflictHelperFactory( function ( $submitButtonLabel ) use ( $editPage ) {
-				return new InlineTwoColConflictHelper(
-					$editPage->getTitle(),
-					$editPage->getContext()->getOutput(),
-					MediaWikiServices::getInstance()->getStatsdDataFactory(),
-					$submitButtonLabel
-				);
-			} );
-		} else {
-			$editPage->setEditConflictHelperFactory( function ( $submitButtonLabel ) use ( $editPage ) {
-				return new SplitTwoColConflictHelper(
-					$editPage->getTitle(),
-					$editPage->getContext()->getOutput(),
-					MediaWikiServices::getInstance()->getStatsdDataFactory(),
-					$submitButtonLabel,
-					$editPage->summary
-				);
-			} );
-		}
+		$editPage->setEditConflictHelperFactory( function ( $submitButtonLabel ) use ( $editPage ) {
+			return new SplitTwoColConflictHelper(
+				$editPage->getTitle(),
+				$editPage->getContext()->getOutput(),
+				MediaWikiServices::getInstance()->getStatsdDataFactory(),
+				$submitButtonLabel,
+				$editPage->summary
+			);
+		} );
 	}
 
 	public static function onImportFormData( EditPage $editPage, \WebRequest $request ) {
+		$contentRows = $request->getArray( 'mw-twocolconflict-split-content' );
+		$extraLineFeeds = $request->getArray( 'mw-twocolconflict-split-linefeeds' );
 		$sideSelection = $request->getArray( 'mw-twocolconflict-side-selector' );
 
-		if ( $request->getBool( 'mw-twocolconflict-submit' ) && $sideSelection !== null ) {
+		if ( $request->getBool( 'mw-twocolconflict-submit' ) &&
+			$contentRows !== null &&
+			$extraLineFeeds !== null &&
+			$sideSelection !== null
+		) {
 			$editPage->textbox1 = SplitConflictMerger::mergeSplitConflictResults(
-				$request->getArray( 'mw-twocolconflict-split-content' ),
-				$request->getArray( 'mw-twocolconflict-split-linefeeds' ),
+				$contentRows,
+				$extraLineFeeds,
 				$sideSelection
 			);
 		}
@@ -112,28 +98,33 @@ class TwoColConflictHooks {
 					'isAnon' => $user->isAnon(),
 					'editCount' => (int)$user->getEditCount(),
 					'pageNs' => $editPage->getTitle()->getNamespace(),
-					'baseRevisionId' => ( $baseRevision ? $baseRevision->getId() : 0 ),
-					'latestRevisionId' => ( $latestRevision ? $latestRevision->getId() : 0 ),
+					'baseRevisionId' => $baseRevision ? $baseRevision->getId() : 0,
+					'latestRevisionId' => $latestRevision ? $latestRevision->getId() : 0,
 					'textUser' => $editPage->textbox2,
 				]
 			);
 		}
 	}
 
-	public static function onEditPageShowEditFormInitial(
+	/**
+	 * @param EditPage $editPage
+	 * @param array &$buttons
+	 * @param int &$tabindex
+	 */
+	public static function onEditPageBeforeEditButtons(
 		EditPage $editPage,
-		OutputPage $outputPage
+		array &$buttons,
+		&$tabindex
 	) {
-		if ( $editPage instanceof TwoColConflictTestEditPage ||
-			$outputPage->getRequest()->getArray( 'mw-twocolconflict-side-selector' ) === null ||
-			!self::shouldTwoColConflictBeShown( $editPage->getContext()->getUser() ) ||
-			!self::shouldUseSplitInterface( $editPage->getContext()->getRequest() )
+		if ( self::shouldTwoColConflictBeShown( $editPage->getContext()->getUser() ) &&
+			!( $editPage instanceof TwoColConflictTestEditPage ) &&
+			$editPage->isConflict === true
 		) {
-			return;
-		}
-
-		if ( $editPage->formtype === 'preview' || $editPage->formtype === 'diff' ) {
-			$editPage->isConflict = true;
+			unset( $buttons['diff'] );
+			// T230152
+			if ( isset( $buttons['preview'] ) ) {
+				$buttons['preview']->setDisabled( true );
+			}
 		}
 	}
 
@@ -175,10 +166,10 @@ class TwoColConflictHooks {
 	public static function onResourceLoaderTestModules( array &$testModules, \ResourceLoader $rl ) {
 		$testModules['qunit']['ext.TwoColConflict.tests'] = [
 			'scripts' => [
-				'tests/qunit/InlineTwoColConflict/TwoColConflict.HelpDialog.test.js'
+				'tests/qunit/SplitTwoColConflict/TwoColConflict.Merger.test.js'
 			],
 			'dependencies' => [
-				'ext.TwoColConflict.Inline.HelpDialog'
+				'ext.TwoColConflict.Split.Merger'
 			],
 			'localBasePath' => dirname( __DIR__ ),
 			'remoteExtPath' => 'TwoColConflict',

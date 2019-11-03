@@ -1,42 +1,36 @@
-/* eslint-env node */
+/* eslint-env node, es6 */
 module.exports = function ( grunt ) {
 	var conf = grunt.file.readJSON( 'extension.json' );
 
 	grunt.loadNpmTasks( 'grunt-banana-checker' );
 	grunt.loadNpmTasks( 'grunt-eslint' );
-	grunt.loadNpmTasks( 'grunt-jsonlint' );
 	grunt.loadNpmTasks( 'grunt-stylelint' );
 	grunt.loadNpmTasks( 'grunt-svgmin' );
 
 	grunt.initConfig( {
 		eslint: {
+			options: {
+				reportUnusedDisableDirectives: true,
+				extensions: [ '.js', '.json' ],
+				cache: true
+			},
 			all: [
-				'*.js',
-				'tests/**/*.js',
-				'modules/**/*.js'
+				'**/*.{js,json}',
+				'!{vendor,node_modules}/**'
 			]
 		},
 		stylelint: {
 			all: [
-				'modules/**/*.css',
-				'modules/**/*.less',
-				'!node_modules/**',
-				'!vendor/**'
+				'**/*.{css,less}',
+				'!{vendor,node_modules}/**'
 			]
 		},
 		banana: conf.MessagesDirs,
-		jsonlint: {
-			all: [
-				'**/*.json',
-				'!node_modules/**',
-				'!vendor/**'
-			]
-		},
 		// SVG Optimization
 		svgmin: {
 			options: {
 				js2svg: {
-					indent: '	',
+					indent: '\t',
 					pretty: true
 				},
 				multipass: true,
@@ -59,11 +53,11 @@ module.exports = function ( grunt ) {
 			all: {
 				files: [ {
 					expand: true,
-					cwd: '	resources/ext.TwoColConflict.helpDialog',
+					cwd: 'resources/ext.TwoColConflict.helpDialog',
 					src: [
 						'**/*.svg'
 					],
-					dest: '	resources/ext.TwoColConflict.helpDialog/',
+					dest: 'resources/ext.TwoColConflict.helpDialog/',
 					ext: '.svg'
 				} ]
 			}
@@ -71,6 +65,6 @@ module.exports = function ( grunt ) {
 	} );
 
 	grunt.registerTask( 'minify', 'svgmin' );
-	grunt.registerTask( 'test', [ 'eslint', 'jsonlint', 'stylelint', 'banana' ] );
+	grunt.registerTask( 'test', [ 'eslint', 'stylelint', 'banana' ] );
 	grunt.registerTask( 'default', [ 'minify', 'test' ] );
 };

@@ -1,10 +1,9 @@
 const Page = require( 'wdio-mediawiki/Page' ),
-	EditPage = require( '../../../../../tests/selenium/pageobjects/edit.page' ),
+	EditPage = require( '../pageobjects/edit.page' ),
 	BetaPreferencesPage = require( '../pageobjects/betapreferences.page' ),
 	UserLoginPage = require( 'wdio-mediawiki/LoginPage' ),
 	Api = require( 'wdio-mediawiki/Api' ),
-	Util = require( 'wdio-mediawiki/Util' ),
-	MWBot = require( 'mwbot' );
+	Util = require( 'wdio-mediawiki/Util' );
 
 class EditConflictPage extends Page {
 	get conflictHeader() { return browser.element( '.mw-twocolconflict-split-header' ); }
@@ -16,6 +15,7 @@ class EditConflictPage extends Page {
 	getResetButton( column ) { return browser.element( this.columnToClass( column ) + ' .mw-twocolconflict-split-reset-button' ); }
 	getEditor( column ) { return browser.element( this.columnToClass( column ) + ' .mw-twocolconflict-split-editor' ); }
 	getDiffText( column ) { return browser.element( this.columnToClass( column ) + ' .mw-twocolconflict-split-difftext' ); }
+	getEditDisabledEditButtonPopup( column ) { return browser.element( this.columnToClass( column ) + ' .mw-twocolconflict-split-disabled-edit-button-popup' ); }
 
 	get yourParagraphSelection() { return browser.element( '.mw-twocolconflict-split-selection div:nth-child(2) span' ); }
 	get resetConfirmationPopup() { return browser.element( '.oo-ui-window-content' ); }
@@ -31,9 +31,9 @@ class EditConflictPage extends Page {
 	get tourDialog() { return browser.element( '.mw-twocolconflict-split-tour-intro-container' ); }
 	get tourDialogCloseButton() { return browser.element( '.mw-twocolconflict-split-tour-intro-container a' ); }
 
-	get tourDiffChangeButton() { return browser.element( '.mw-twocolconflict-diffchange .mw-twocolconflict-split-tour-still-button' ); }
-	get tourSplitSelectionButton() { return browser.element( '.mw-twocolconflict-split-selection .mw-twocolconflict-split-tour-still-button' ); }
-	get tourYourVersionHeaderButton() { return browser.element( '.mw-twocolconflict-split-your-version-header .mw-twocolconflict-split-tour-still-button' ); }
+	get tourDiffChangeButton() { return browser.element( '.mw-twocolconflict-diffchange .mw-twocolconflict-split-tour-pulsating-button' ); }
+	get tourSplitSelectionButton() { return browser.element( '.mw-twocolconflict-split-selection .mw-twocolconflict-split-tour-pulsating-button' ); }
+	get tourYourVersionHeaderButton() { return browser.element( '.mw-twocolconflict-split-your-version-header .mw-twocolconflict-split-tour-pulsating-button' ); }
 
 	get tourDiffChangePopup() { return browser.element( '.mw-twocolconflict-diffchange .mw-twocolconflict-split-tour-popup' ); }
 	get tourDiffChangePopupCloseButton() { return browser.element( '.mw-twocolconflict-diffchange .mw-twocolconflict-split-tour-popup a' ); }
@@ -41,6 +41,13 @@ class EditConflictPage extends Page {
 	get submitButton() { return browser.element( '#wpSave' ); }
 	get previewButton() { return browser.element( '#wpPreview' ); }
 	get diffButton() { return browser.element( '#wpDiff' ); }
+
+	get previewView() { return browser.element( '#wikiPreview' ); }
+	get previewText() { return browser.element( '#wikiPreview .mw-parser-output' ); }
+
+	hoverEditButton( column ) {
+		browser.moveToObject( this.columnToClass( column ) + ' .mw-twocolconflict-split-edit-button' );
+	}
 
 	columnToClass( column ) {
 		switch ( column ) {
@@ -66,76 +73,87 @@ class EditConflictPage extends Page {
 	 */
 	toggleHelpDialog( show ) {
 		var hide = show === false;
-
-		browser.pause( 300 ); // wait for mw JS to load
+		Util.waitForModuleState( 'mediawiki.base' );
 
 		return browser.execute( function ( hide ) {
-			return ( new mediaWiki.Api() ).saveOption(
-				'userjs-twocolconflict-hide-help-dialogue',
-				hide ? '1' : '0'
-			);
+			/* global mw */
+			return mw.loader.using( 'mediawiki.api' ).then( function () {
+				return new mw.Api().saveOption(
+					'userjs-twocolconflict-hide-help-dialogue',
+					hide ? '1' : '0'
+				);
+			} );
 		}, hide );
 	}
 
-	prepareEditConflict() {
+	prepareEditConflict( conflictUser, conflictUserPassword ) {
+		browser.call( function () {
+			return Api.createAccount( conflictUser, conflictUserPassword );
+		} );
 		UserLoginPage.loginAdmin();
 		BetaPreferencesPage.enableTwoColConflictBetaFeature();
 		this.toggleHelpDialog( false );
 		this.enforceSplitEditConflict();
+
+		browser.execute( function () {
+			return mw.loader.using( 'mediawiki.api' ).then( function () {
+				return new mw.Api().saveOptions( {
+					'visualeditor-hidebetawelcome': '1',
+					'visualeditor-betatempdisable': '1'
+				} );
+			} );
+		} );
 	}
 
 	showSimpleConflict( conflictUser, conflictUserPassword ) {
 		this.createConflict(
-			Util.getTestString( 'conflict-title-' ),
 			conflictUser,
 			conflictUserPassword,
 			'Line1\nLine2',
-			'Line1\nChangeA',
-			'Line1\nChangeB'
+			'Line1\nChange <span lang="de">A</span>',
+			'Line1\nChange <span lang="en">B</span>'
 		);
-
-		this.infoButton.waitForVisible( 60000 ); // JS for the tour is loaded
 	}
 
 	showBigConflict( conflictUser, conflictUserPassword ) {
 		this.createConflict(
-			Util.getTestString( 'conflict-title-' ),
 			conflictUser,
 			conflictUserPassword,
 			'Line1\nLine2\nLine3\nline4',
-			'Line1\nLine2\nLine3\nChangeA',
-			'Line1\nLine2\nLine3\nChangeB'
+			'Line1\nLine2\nLine3\nChange <span lang="de">A</span>',
+			'Line1\nLine2\nLine3\nChange <span lang="en">B</span>'
 		);
-
-		this.infoButton.waitForVisible( 60000 ); // JS for the tour is loaded
 	}
 
-	createConflict( title, conflictUser, conflictUserPassword, startText, otherText, yourText ) {
+	createConflict( conflictUser, conflictUserPassword, startText, otherText, yourText ) {
+		const title = Util.getTestString( 'conflict-title-' );
+
 		browser.call( function () {
 			return Api.edit(
 				title,
 				startText
 			);
 		} );
-		browser.pause( 300 ); // make sure Api edit is finished
+
+		browser.pause( 500 ); // make sure Api edit is finished
 
 		EditPage.openForEditing( title );
+		EditPage.content.waitForExist();
 
 		browser.call( function () {
-			let bot = new MWBot();
-
-			return bot.loginGetEditToken( {
-				apiUrl: `${browser.options.baseUrl}/api.php`,
-				username: conflictUser,
-				password: conflictUserPassword
-			} ).then( function () {
-				return bot.edit( title, otherText, `Changed content to "${otherText}"` );
-			} );
+			return Api.edit(
+				title,
+				otherText,
+				conflictUser,
+				conflictUserPassword
+			);
 		} );
-		browser.pause( 300 ); // make sure bot edit is finished
+		browser.pause( 500 ); // make sure Api edit is finished
 
 		EditPage.content.setValue( yourText );
 		EditPage.save.click();
+
+		this.infoButton.waitForVisible( 60000 ); // JS for the tour is loaded
 	}
 }
 

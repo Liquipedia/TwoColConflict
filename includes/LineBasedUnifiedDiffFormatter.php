@@ -3,7 +3,6 @@
 namespace TwoColConflict;
 
 use Diff;
-use DiffFormatter;
 use MediaWiki\Diff\WordAccumulator;
 use WordLevelDiff;
 
@@ -11,32 +10,17 @@ use WordLevelDiff;
  * @license GPL-2.0-or-later
  * @author Christoph Jauera <christoph.jauera@wikimedia.de>
  */
-class LineBasedUnifiedDiffFormatter extends DiffFormatter {
-
-	/**
-	 * @var string String added to <ins> tags.
-	 */
-	public $insClass = ' class="diffchange"';
-
-	/**
-	 * @var string String added to <del> tags.
-	 */
-	public $delClass = ' class="diffchange"';
+class LineBasedUnifiedDiffFormatter {
 
 	/**
 	 * @var int
 	 */
-	private $oldline;
+	private $oldLine;
 
 	/**
 	 * @var int
 	 */
-	private $newline;
-
-	/**
-	 * @var array[]
-	 */
-	private $retval;
+	private $newLine;
 
 	/**
 	 * @param Diff $diff A Diff object.
@@ -46,49 +30,68 @@ class LineBasedUnifiedDiffFormatter extends DiffFormatter {
 	 *   left side of the diff. Since the right side can hold more lines than the left, one line
 	 *   in the array can hold at least one delete, change or copy as well as an add action.
 	 */
-	public function format( $diff ) {
-		$this->oldline = 0;
-		$this->newline = 0;
-		$this->retval = [];
+	public function format( Diff $diff ) {
+		$changes = [];
+		$this->oldLine = 0;
+		$this->newLine = 0;
 
 		foreach ( $diff->getEdits() as $edit ) {
 			switch ( $edit->getType() ) {
 				case 'add':
-					$this->addLines( $edit->getClosing() );
-					$this->newline += count( $edit->getClosing() );
+					$this->trackAdd(
+						$changes,
+						$this->oldLine,
+						count( $edit->getClosing() ),
+						'<ins class="mw-twocolconflict-diffchange">' .
+							$this->composeLines( $edit->getClosing() ) . '</ins>'
+					);
 					break;
+
 				case 'delete':
-					$this->deleteLines( $edit->getOrig() );
-					$this->oldline += count( $edit->getOrig() );
+					$this->trackDelete(
+						$changes,
+						$this->oldLine,
+						count( $edit->getOrig() ),
+						'<del class="mw-twocolconflict-diffchange">' .
+							$this->composeLines( $edit->getOrig() ) . '</del>'
+					);
 					break;
+
 				case 'change':
+					// Required because trackDelete() will (and should) increase $this->oldLine.
+					$originalLineNumber = $this->oldLine;
 					$wordLevelDiff = $this->rTrimmedWordLevelDiff( $edit->getOrig(), $edit->getClosing() );
 
-					$this->retval[$this->oldline][] = [
-						'action' => 'delete',
-						'old' => $this->getOriginalInlineDiff( $wordLevelDiff ),
-						'oldline' => $this->oldline,
+					$this->trackDelete(
+						$changes,
+						$originalLineNumber,
+						count( $edit->getOrig() ),
+						$this->getOriginalInlineDiff( $wordLevelDiff )
+					);
+					$this->trackAdd(
+						$changes,
+						$originalLineNumber,
+						count( $edit->getClosing() ),
+						$this->getClosingInlineDiff( $wordLevelDiff )
+					);
+					break;
+
+				case 'copy':
+					$changes[$this->oldLine][] = [
+						'action' => 'copy',
+						// TODO: The "copy" element is not used in split mode, and can be removed
+						// when the inline mode is gone.
+						'copy' => htmlspecialchars( implode( "\n", $edit->getOrig() ) ),
+						'oldline' => $this->oldLine,
 						'count' => count( $edit->getOrig() ),
 					];
-					$this->retval[$this->oldline][] = [
-						'action' => 'add',
-						'new' => $this->getClosingInlineDiff( $wordLevelDiff ),
-						'newline' => $this->newline,
-						'count' => count( $edit->getClosing() ),
-					];
-
-					$this->oldline += count( $edit->getOrig() );
-					$this->newline += count( $edit->getClosing() );
-					break;
-				case 'copy':
-					$this->copyLines( $edit->getOrig() );
-					$this->oldline += count( $edit->getOrig() );
-					$this->newline += count( $edit->getOrig() );
+					$this->oldLine += count( $edit->getOrig() );
+					$this->newLine += count( $edit->getOrig() );
 					break;
 			}
 		}
 
-		return $this->retval;
+		return $changes;
 	}
 
 	/**
@@ -124,39 +127,44 @@ class LineBasedUnifiedDiffFormatter extends DiffFormatter {
 	}
 
 	/**
-	 * @param string[] $lines Lines that should be marked deleted.
+	 * Will increase $this->oldLine by $lineCount.
+	 *
+	 * @param array[] &$changes
+	 * @param int $index
+	 * @param int $lineCount Number of source code lines in the $diffHtml
+	 * @param string $diffHtml HTML
 	 */
-	private function deleteLines( array $lines ) {
-		$this->retval[$this->oldline][] = [
+	private function trackDelete( array &$changes, $index, $lineCount, $diffHtml ) {
+		$changes[$index][] = [
 			'action' => 'delete',
-			'old' => "<del{$this->delClass}>" . $this->composeLines( $lines ) . '</del>',
-			'oldline' => $this->oldline,
-			'count' => count( $lines ),
+			'old' => $diffHtml,
+			'oldline' => $this->oldLine,
+			'count' => $lineCount,
 		];
+		$this->oldLine += $lineCount;
 	}
 
 	/**
-	 * @param string[] $lines Lines that should be marked as added.
+	 * Will increase $this->newLine by $lineCount.
+	 *
+	 * @param array[] &$changes
+	 * @param int $index
+	 * @param int $lineCount Number of source code lines in the $diffHtml
+	 * @param string $diffHtml HTML
 	 */
-	private function addLines( array $lines ) {
-		$this->retval[$this->oldline][] = [
+	private function trackAdd(
+		array &$changes,
+		$index,
+		$lineCount,
+		$diffHtml
+	) {
+		$changes[$index][] = [
 			'action' => 'add',
-			'new' => "<ins{$this->insClass}>" . $this->composeLines( $lines ) . '</ins>',
-			'newline' => $this->newline,
-			'count' => count( $lines ),
+			'new' => $diffHtml,
+			'newline' => $this->newLine,
+			'count' => $lineCount,
 		];
-	}
-
-	/**
-	 * @param string[] $lines Lines that should be copied.
-	 */
-	private function copyLines( array $lines ) {
-		$this->retval[$this->oldline][] = [
-			'action' => 'copy',
-			'copy' => $this->composeLines( $lines, false ),
-			'oldline' => $this->oldline,
-			'newline' => $this->newline
-		];
+		$this->newLine += $lineCount;
 	}
 
 	/**
@@ -204,39 +212,24 @@ class LineBasedUnifiedDiffFormatter extends DiffFormatter {
 	 */
 	private function getWordAccumulator() {
 		$wordAccumulator = new WordAccumulator;
-		$wordAccumulator->insClass = $this->insClass;
-		$wordAccumulator->delClass = $this->delClass;
+		$wordAccumulator->insClass = ' class="mw-twocolconflict-diffchange"';
+		$wordAccumulator->delClass = ' class="mw-twocolconflict-diffchange"';
 		return $wordAccumulator;
 	}
 
 	/**
 	 * @param string[] $lines Lines that should be composed.
-	 * @param boolean $replaceEmptyLine
 	 *
 	 * @return string HTML
 	 */
-	private function composeLines( array $lines, $replaceEmptyLine = true ) {
-		$result = [];
-		foreach ( $lines as $line ) {
-			$line = htmlspecialchars( $line );
-			$result[] = $this->replaceEmptyLine( $line, $replaceEmptyLine );
-		}
-		return implode( "\n", $result );
-	}
-
-	/**
-	 * Replace empty lines with a no-break space
-	 *
-	 * @param string $line Lines that should be altered.
-	 * @param boolean $replaceEmptyLine
-	 *
-	 * @return string
-	 */
-	private function replaceEmptyLine( $line, $replaceEmptyLine = true ) {
-		if ( $line === '' && $replaceEmptyLine ) {
-			$line = "\u{00A0}";
-		}
-		return $line;
+	private function composeLines( array $lines ) {
+		return htmlspecialchars( implode( "\n", array_map(
+			function ( $line ) {
+				// Replace empty lines with a non-breaking space
+				return $line === '' ? "\u{00A0}" : $line;
+			},
+			$lines
+		) ) );
 	}
 
 }

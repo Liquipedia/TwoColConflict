@@ -5,6 +5,7 @@ namespace TwoColConflict\Tests\SplitTwoColConflict;
 use Language;
 use MediaWiki\Revision\RevisionRecord;
 use MediaWikiTestCase;
+use Title;
 use TwoColConflict\SplitTwoColConflict\HtmlSplitConflictHeader;
 use User;
 
@@ -16,100 +17,126 @@ use User;
  */
 class HtmlSplitConflictHeaderTest extends MediaWikiTestCase {
 
+	const NOW = 1000000000;
+
 	/**
 	 * @var User
 	 */
 	private $otherUser;
 
-	/**
-	 * @var int
-	 */
-	private $now;
-
-	public function setUp() {
+	public function setUp() : void {
 		parent::setUp();
 
 		$this->setUserLang( 'qqx' );
 		$this->otherUser = $this->getTestUser()->getUser();
-		$this->now = 1000000000;
+	}
+
+	public function testConflictOnNewPage() {
+		$htmlHeader = new HtmlSplitConflictHeader(
+			Title::newFromText( __METHOD__ ),
+			$this->getTestUser()->getUser(),
+			Language::factory( 'qqx' ),
+			self::NOW,
+			''
+		);
+		$html = $htmlHeader->getHtml();
+
+		$this->assertContains(
+			'>(twocolconflict-split-current-version-header: (just-now))<',
+			$html
+		);
+		$this->assertContains( '>(twocolconflict-split-saved-at: )<', $html );
+		$this->assertContains( '>(twocolconflict-split-your-version-header)<', $html );
+		$this->assertContains( '>(twocolconflict-split-not-saved-at)<', $html );
 	}
 
 	public function testGetHtmlMoreThan23HoursAgo() {
 		$htmlHeader = new HtmlSplitConflictHeader(
-			$this->newRevisionRecord( '20180721234200', '' ),
+			Title::newFromText( __METHOD__ ),
 			$this->getTestUser()->getUser(),
 			Language::factory( 'qqx' ),
-			$this->now,
-			''
+			self::NOW,
+			'',
+			$this->newRevisionRecord( '20180721234200' )
 		);
 		$html = $htmlHeader->getHtml();
 
-		$this->assertTagExistsWithTextContents( $html, 'a', $this->otherUser->getName() );
-		$this->assertTagExistsWithTextContents( $html, 'p',
-			'(twocolconflict-split-conflict-hint)' );
-		$this->assertTagExistsWithTextContents( $html, 'span',
-			'(twocolconflict-split-current-version-header: 23:42, 21 (july) 2018)' );
+		$this->assertContains( '>' . $this->otherUser->getName() . '<', $html
+		);
+		$this->assertContains( '>(twocolconflict-split-conflict-hint)<', $html );
+		$this->assertContains(
+			'>(twocolconflict-split-current-version-header: 23:42, 21 (july) 2018)<',
+			$html
+		);
 	}
 
 	public function testGetHtml2HoursAgo() {
-		$ninetyMinutesAgo = $this->now - 90 * 60;
+		$ninetyMinutesAgo = self::NOW - 90 * 60;
 		$htmlHeader = new HtmlSplitConflictHeader(
-			$this->newRevisionRecord( $ninetyMinutesAgo, '' ),
-			User::newFromName( 'TestUser' ),
+			Title::newFromText( __METHOD__ ),
+			$this->getTestUser()->getUser(),
 			Language::factory( 'qqx' ),
-			$this->now,
-			''
+			self::NOW,
+			'',
+			$this->newRevisionRecord( $ninetyMinutesAgo )
 		);
 		$html = $htmlHeader->getHtml();
 
-		$this->assertTagExistsWithTextContents( $html, 'span',
-			'(twocolconflict-split-current-version-header: (hours-ago: 2))' );
+		$this->assertContains(
+			'>(twocolconflict-split-current-version-header: (hours-ago: 2))<',
+			$html
+		);
 	}
 
 	public function testGetHtml2MinutesAgo() {
-		$ninetySecondsAgo = $this->now - 90;
+		$ninetySecondsAgo = self::NOW - 90;
 		$htmlHeader = new HtmlSplitConflictHeader(
-			$this->newRevisionRecord( $ninetySecondsAgo, '' ),
-			User::newFromName( 'TestUser' ),
+			Title::newFromText( __METHOD__ ),
+			$this->getTestUser()->getUser(),
 			Language::factory( 'qqx' ),
-			$this->now,
-			''
+			self::NOW,
+			'',
+			$this->newRevisionRecord( $ninetySecondsAgo )
 		);
 		$html = $htmlHeader->getHtml();
 
-		$this->assertTagExistsWithTextContents( $html, 'span',
-			'(twocolconflict-split-current-version-header: (minutes-ago: 2))' );
+		$this->assertContains(
+			'>(twocolconflict-split-current-version-header: (minutes-ago: 2))<',
+			$html
+		);
 	}
 
 	public function testGetHtml2SecondsAgo() {
-		$twoSecondsAgo = $this->now - 2;
+		$twoSecondsAgo = self::NOW - 2;
 		$htmlHeader = new HtmlSplitConflictHeader(
-			$this->newRevisionRecord( $twoSecondsAgo, '' ),
-			User::newFromName( 'TestUser' ),
+			Title::newFromText( __METHOD__ ),
+			$this->getTestUser()->getUser(),
 			Language::factory( 'qqx' ),
-			$this->now,
-			''
+			self::NOW,
+			'',
+			$this->newRevisionRecord( $twoSecondsAgo )
 		);
 		$html = $htmlHeader->getHtml();
 
-		$this->assertTagExistsWithTextContents( $html, 'span',
-			'(twocolconflict-split-current-version-header: (seconds-ago: 2))' );
+		$this->assertContains(
+			'>(twocolconflict-split-current-version-header: (seconds-ago: 2))<',
+			$html
+		);
 	}
 
 	public function testGetHtmlWithEditSummaries() {
 		$htmlHeader = new HtmlSplitConflictHeader(
-			$this->newRevisionRecord( $this->now, 'Latest revision summary' ),
-			User::newFromName( 'TestUser' ),
+			Title::newFromText( __METHOD__ ),
+			$this->getTestUser()->getUser(),
 			Language::factory( 'qqx' ),
-			$this->now,
-			'Conflicting edit summary'
+			self::NOW,
+			'Conflicting edit summary',
+			$this->newRevisionRecord( self::NOW, 'Latest revision summary' )
 		);
 		$html = $htmlHeader->getHtml();
 
-		$this->assertTagExistsWithTextContents( $html, 'span',
-			'(parentheses: Latest revision summary)' );
-		$this->assertTagExistsWithTextContents( $html, 'span',
-			'(parentheses: Conflicting edit summary)' );
+		$this->assertContains( '>(parentheses: Latest revision summary)<', $html );
+		$this->assertContains( '>(parentheses: Conflicting edit summary)<', $html );
 	}
 
 	/**
@@ -118,30 +145,15 @@ class HtmlSplitConflictHeaderTest extends MediaWikiTestCase {
 	 *
 	 * @return RevisionRecord
 	 */
-	private function newRevisionRecord( $timestamp, $editSummary ) {
+	private function newRevisionRecord( $timestamp, $editSummary = '' ) {
 		$revision = $this->createMock( RevisionRecord::class );
 		$revision->method( 'getUser' )
 			->willReturn( $this->otherUser );
 		$revision->method( 'getTimestamp' )
 			->willReturn( $timestamp );
-
-		$comment = $this->createMock( \CommentStoreComment::class );
-		$comment->text = $editSummary;
 		$revision->method( 'getComment' )
-			->willReturn( $comment );
-
+			->willReturn( $editSummary ? (object)[ 'text' => $editSummary ] : null );
 		return $revision;
-	}
-
-	private function assertTagExistsWithTextContents( $html, $tagName, $value ) {
-		assertThat(
-			$html,
-			is( htmlPiece( havingChild( both(
-				withTagName( $tagName ) )
-				->andAlso( havingTextContents( $value ) )
-			) ) )
-		);
-		$this->addToAssertionCount( 1 );
 	}
 
 }

@@ -1,4 +1,4 @@
-( function ( mw, $ ) {
+( function () {
 
 	/**
 	 * Module containing the SplitTwoColConflict tour
@@ -49,25 +49,25 @@
 			)
 			.append( closeButton.$element );
 
-		this.$dialog = new TourDialog( {
+		this.dialog = new TourDialog( {
 			size: 'large',
 			panel: $panel
 		} );
 
 		closeButton.on( 'click', function () {
-			self.$dialog.close();
+			self.dialog.close();
 			self.showButtons();
 		} );
 
 		this.windowManager = windowManager;
 		$( 'body' ).append( this.windowManager.$element );
-		this.windowManager.addWindows( [ this.$dialog ] );
+		this.windowManager.addWindows( [ this.dialog ] );
 	};
 
 	$.extend( Tour.prototype, {
 
 		/**
-		 * @type {TourDialog}
+		 * @type {OO.ui.Dialog}
 		 */
 		dialog: null,
 
@@ -86,21 +86,18 @@
 		 * @return {jQuery}
 		 */
 		createPopupButton: function ( $element ) {
-			var $stillButton = $( '<div>' ),
-				$pulsatingButton = $( '<div>' );
+			var $pulsatingButton = $( '<div>' ).addClass( 'mw-pulsating-dot' );
 
 			$pulsatingButton.addClass( 'mw-twocolconflict-split-tour-pulsating-button' );
-			$stillButton.addClass( 'mw-twocolconflict-split-tour-still-button' );
-			$stillButton.appendTo( $element );
-			$stillButton.hide();
+			$pulsatingButton.appendTo( $element );
+			$pulsatingButton.hide();
 
-			$pulsatingButton.appendTo( $stillButton );
-			return $stillButton;
+			return $pulsatingButton;
 		},
 
 		/**
-		 * @param {String} header
-		 * @param {String} message
+		 * @param {string} header
+		 * @param {string} message
 		 * @param {jQuery} $pulsatingButton
 		 * @return {OO.ui.PopupWidget}
 		 */
@@ -142,7 +139,9 @@
 			this.buttons.forEach( function ( data ) {
 				if ( !data.popup ) {
 					data.$pulsatingButton = self.createPopupButton( data.$element );
-					data.popup = self.createPopup( data.header, data.message, data.$pulsatingButton );
+					data.popup = self.createPopup(
+						data.header, data.message, data.$pulsatingButton
+					);
 					data.$element.append( data.popup.$element );
 				}
 
@@ -195,7 +194,7 @@
 
 		showTour: function () {
 			this.hideTourPopups();
-			this.windowManager.openWindow( this.$dialog );
+			this.windowManager.openWindow( this.dialog );
 		}
 	} );
 
@@ -215,4 +214,4 @@
 	mw.libs.twoColConflict = mw.libs.twoColConflict || {};
 	mw.libs.twoColConflict.split = mw.libs.twoColConflict.split || {};
 	mw.libs.twoColConflict.split.Tour = Tour;
-}( mediaWiki, jQuery ) );
+}() );

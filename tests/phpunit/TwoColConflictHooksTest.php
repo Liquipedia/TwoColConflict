@@ -14,7 +14,7 @@ use TwoColConflict\TwoColConflictHooks;
  */
 class TwoColConflictHooksTest extends \MediaWikiTestCase {
 
-	protected function setUp() {
+	protected function setUp() : void {
 		parent::setUp();
 
 		$this->setMwGlobals( 'wgFileImporterAccountForSuppressedUsername', '<SUPPRESSED>' );
@@ -85,9 +85,9 @@ class TwoColConflictHooksTest extends \MediaWikiTestCase {
 	 * @dataProvider provideOnImportFormData
 	 */
 	public function testOnImportFormData(
-		array $sideSelection = null,
-		array $splitContent = null,
-		array $splitLineFeeds = null,
+		?array $sideSelection,
+		?array $splitContent,
+		?array $splitLineFeeds,
 		$expected
 	) {
 		$editPage = $this->createEditPage();

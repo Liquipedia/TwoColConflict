@@ -38,7 +38,9 @@ abstract class SpecialPageHtmlFragment implements MessageLocalizer {
 		if ( $specialPage instanceof self ) {
 			$specialPage = $specialPage->specialPage;
 		} elseif ( !( $specialPage instanceof SpecialPage ) ) {
-			throw new InvalidArgumentException( 'Invalid $specialPage' );
+			throw new InvalidArgumentException(
+				'$specialPage must be a SpecialPage or SpecialPageHtmlFragment'
+			);
 		}
 
 		$this->specialPage = $specialPage;
@@ -83,11 +85,11 @@ abstract class SpecialPageHtmlFragment implements MessageLocalizer {
 	 * @see MessageLocalizer::msg
 	 *
 	 * @param string|string[]|\MessageSpecifier $key
-	 * @param mixed $params,... Any number of message parameters
+	 * @param mixed ...$params Any number of message parameters
 	 *
 	 * @return Message
 	 */
-	public function msg( $key ) {
+	public function msg( $key, ...$params ) {
 		return call_user_func_array( [ $this->specialPage, 'msg' ], func_get_args() );
 	}
 

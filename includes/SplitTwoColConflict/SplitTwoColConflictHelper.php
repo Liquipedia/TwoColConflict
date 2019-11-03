@@ -4,12 +4,9 @@ namespace TwoColConflict\SplitTwoColConflict;
 
 use Html;
 use MediaWiki\EditPage\TextConflictHelper;
-use MediaWiki\Revision\RevisionRecord;
 use OutputPage;
 use Title;
 use TwoColConflict\LineBasedUnifiedDiffFormatter;
-use UnexpectedValueException;
-use WikiPage;
 
 /**
  * @license GPL-2.0-or-later
@@ -58,12 +55,49 @@ class SplitTwoColConflictHelper extends TextConflictHelper {
 	}
 
 	/**
+	 * @inheritDoc
+	 */
+	public function incrementConflictStats() {
+		parent::incrementConflictStats();
+		$this->stats->increment( 'TwoColConflict.conflict' );
+		// XXX This is copied directly from core and we may be able to refactor something here.
+		// Only include 'standard' namespaces to avoid creating unknown numbers of statsd metrics
+		if (
+			$this->title->getNamespace() >= NS_MAIN &&
+			$this->title->getNamespace() <= NS_CATEGORY_TALK
+		) {
+			$this->stats->increment(
+				'TwoColConflict.conflict.byNamespaceId.' . $this->title->getNamespace()
+			);
+		}
+	}
+
+	/**
+	 * @inheritDoc
+	 */
+	public function incrementResolvedStats() {
+		parent::incrementResolvedStats();
+		$this->stats->increment( 'TwoColConflict.conflict.resolved' );
+		// XXX This is copied directly from core and we may be able to refactor something here.
+		// Only include 'standard' namespaces to avoid creating unknown numbers of statsd metrics
+		if (
+			$this->title->getNamespace() >= NS_MAIN &&
+			$this->title->getNamespace() <= NS_CATEGORY_TALK
+		) {
+			$this->stats->increment(
+				'TwoColConflict.conflict.resolved.byNamespaceId.' . $this->title->getNamespace()
+			);
+		}
+	}
+
+	/**
 	 * @param string $yourtext
 	 * @param string $storedversion
 	 */
 	public function setTextboxes( $yourtext, $storedversion ) {
-		$contentRows = $this->out->getRequest()->getArray( 'mw-twocolconflict-split-content' );
-		$extraLineFeeds = $this->out->getRequest()->getArray( 'mw-twocolconflict-split-linefeeds' );
+		$request = $this->out->getRequest();
+		$contentRows = $request->getArray( 'mw-twocolconflict-split-content' );
+		$extraLineFeeds = $request->getArray( 'mw-twocolconflict-split-linefeeds' );
 
 		// The incoming $yourtext is already merged, possibly containing paragraphs from both sides.
 		// If we can, we restore the users original submission.
@@ -72,6 +106,11 @@ class SplitTwoColConflictHelper extends TextConflictHelper {
 				$contentRows,
 				$extraLineFeeds,
 				'your'
+			);
+			$storedversion = SplitConflictMerger::mergeSplitConflictResults(
+				$contentRows,
+				$extraLineFeeds,
+				'other'
 			);
 		}
 
@@ -90,32 +129,6 @@ class SplitTwoColConflictHelper extends TextConflictHelper {
 		return preg_split( '/\n(?!\n)/',
 			str_replace( "\r\n", "\n", $text )
 		);
-	}
-
-	/**
-	 * @return RevisionRecord
-	 */
-	public function getRevisionRecord() {
-		$wikiPage = WikiPage::factory( $this->title );
-		/** @see https://phabricator.wikimedia.org/T203085 */
-		$wikiPage->loadPageData( 'fromdbmaster' );
-		$revision = $wikiPage->getRevision();
-
-		if ( !$revision ) {
-			throw new UnexpectedValueException( 'The title "' . $this->title->getPrefixedText() .
-				'" does not refer to an existing page' );
-		}
-
-		return $revision->getRevisionRecord();
-	}
-
-	/**
-	 * FIXME: This also looks like it is to generic, and can be replaced with more specific getters
-	 *
-	 * @return OutputPage
-	 */
-	public function getOutput() {
-		return $this->out;
 	}
 
 	/**
@@ -170,12 +183,8 @@ class SplitTwoColConflictHelper extends TextConflictHelper {
 	 * @return string
 	 */
 	public function getEditFormHtmlAfterContent() {
-		$this->out->addModuleStyles( [
-			'ext.TwoColConflict.SplitCss',
-		] );
-		$this->out->addModules( [
-			'ext.TwoColConflict.SplitJs',
-		] );
+		$this->out->addModuleStyles( 'ext.TwoColConflict.SplitCss' );
+		$this->out->addModules( 'ext.TwoColConflict.SplitJs' );
 		return '';
 	}
 
@@ -185,21 +194,22 @@ class SplitTwoColConflictHelper extends TextConflictHelper {
 	 * @return string
 	 */
 	private function buildEditConflictView() {
-		$unifiedDiff = $this->getLineBasedUnifiedDiff();
+		$user = $this->out->getUser();
+		$language = $this->out->getLanguage();
 
 		$out = ( new HtmlSplitConflictHeader(
-			$this->getRevisionRecord(),
-			$this->getOutput()->getUser(),
-			$this->getOutput()->getLanguage(),
+			$this->title,
+			$user,
+			$language,
 			false,
 			$this->newEditSummary
 		) )->getHtml();
 		$out .= ( new HtmlSplitConflictView(
-			$this->out->getUser(),
-			$this->out->getLanguage(),
+			$user,
+			$language,
 			$this->out->getRequest()->getArray( 'mw-twocolconflict-side-selector' ) ?: []
 		) )->getHtml(
-			$unifiedDiff,
+			$this->getLineBasedUnifiedDiff(),
 			$this->yourLines,
 			$this->storedLines
 		);
@@ -223,8 +233,7 @@ class SplitTwoColConflictHelper extends TextConflictHelper {
 	 */
 	private function getLineBasedUnifiedDiff() {
 		$formatter = new LineBasedUnifiedDiffFormatter();
-		$formatter->insClass = ' class="mw-twocolconflict-diffchange"';
-		$formatter->delClass = ' class="mw-twocolconflict-diffchange"';
+
 		return $formatter->format(
 			new \Diff( $this->storedLines, $this->yourLines )
 		);

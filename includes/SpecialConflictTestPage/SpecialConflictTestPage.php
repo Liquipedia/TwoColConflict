@@ -5,10 +5,8 @@ namespace TwoColConflict\SpecialConflictTestPage;
 use Article;
 use Html;
 use MediaWiki\MediaWikiServices;
-use Message;
 use SpecialPage;
 use Title;
-use TwoColConflict\InlineTwoColConflict\InlineTwoColConflictTestHelper;
 use TwoColConflict\SplitTwoColConflict\SplitConflictMerger;
 use TwoColConflict\SplitTwoColConflict\SplitTwoColConflictTestHelper;
 
@@ -33,24 +31,19 @@ class SpecialConflictTestPage extends SpecialPage {
 	 */
 	public function execute( $subPage ) {
 		if ( !$this->isInBetaAndEnabled() ) {
-			$this->showWarningBox( ( new Message( 'twocolconflict-test-needsbeta' ) )->parse() );
+			$this->showWarningBox( $this->msg( 'twocolconflict-test-needsbeta' )->text() );
 			return;
 		}
 
 		$this->getOutput()->enableOOUI();
 		$this->addModules();
-		$this->getOutput()->setPageTitle( new Message( 'twocolconflict-test-page-title' ) );
+		$this->getOutput()->setPageTitle( $this->msg( 'twocolconflict-test-page-title' ) );
 		$request = $this->getRequest();
 
-		if ( $request->getVal( 'wpPreview' ) != null || $request->getVal( 'wpDiff' ) != null ) {
-			$this->showHintBoxRaw( ( new Message( 'twocolconflict-test-preview-hint' ) )->parse() );
+		if ( $request->getCheck( 'wpPreview' ) || $request->getCheck( 'wpDiff' ) ) {
+			$this->showHintBoxRaw( $this->msg( 'twocolconflict-test-preview-hint' )->parse() );
 
 			$title = Title::newFromText( $request->getVal( 'mw-twocolconflict-title' ) );
-
-			if ( $this->config->get( 'TwoColConflictUseInline' ) ) {
-				$this->showPreview( $title, $request->getVal( 'wpTextbox1' ) );
-				return;
-			}
 
 			$this->showPreview(
 				$title,
@@ -66,7 +59,7 @@ class SpecialConflictTestPage extends SpecialPage {
 
 		$testTitleText = $request->getVal( 'mw-twocolconflict-test-title' );
 		if ( $testTitleText === null ) {
-			$this->showHintBox( ( new Message( 'twocolconflict-test-initial-hint' ) )->parse() );
+			$this->showHintBox( $this->msg( 'twocolconflict-test-initial-hint' )->parse() );
 
 			$this->showLoadTitle();
 			return;
@@ -74,9 +67,9 @@ class SpecialConflictTestPage extends SpecialPage {
 
 		$testTitle = Title::newFromText( $testTitleText );
 		if ( $testTitle === null || !$testTitle->exists() ) {
-			$this->showHintBox( ( new Message( 'twocolconflict-test-initial-hint' ) )->parse() );
+			$this->showHintBox( $this->msg( 'twocolconflict-test-initial-hint' )->parse() );
 
-			$this->showWarningBox( new Message( 'twocolconflict-test-title-not-existing' ) );
+			$this->showWarningBox( $this->msg( 'twocolconflict-test-title-not-existing' )->text() );
 			$this->showLoadTitle();
 			return;
 		}
@@ -84,15 +77,15 @@ class SpecialConflictTestPage extends SpecialPage {
 		$testArticle = Article::newFromTitle( $testTitle, $this->getContext() );
 
 		if ( !$testArticle->getContentHandler()->supportsDirectEditing() ) {
-			$this->showHintBox( ( new Message( 'twocolconflict-test-initial-hint' ) )->parse() );
+			$this->showHintBox( $this->msg( 'twocolconflict-test-initial-hint' )->parse() );
 
-			$this->showWarningBox( new Message( 'twocolconflict-test-no-direct-editing' ) );
+			$this->showWarningBox( $this->msg( 'twocolconflict-test-no-direct-editing' )->text() );
 			$this->showLoadTitle();
 			return;
 		}
 
-		if ( $request->getVal( 'mw-twocolconflict-test-text' ) === null ) {
-			$this->showHintBox( ( new Message( 'twocolconflict-test-edit-hint' ) )->parse() );
+		if ( !$request->getCheck( 'mw-twocolconflict-test-text' ) ) {
+			$this->showHintBox( $this->msg( 'twocolconflict-test-edit-hint' )->parse() );
 
 			$this->showChangeText(
 				$testArticle->getPage()->getContent()->serialize(),
@@ -102,7 +95,7 @@ class SpecialConflictTestPage extends SpecialPage {
 		}
 
 		$this->showHintBox(
-			( new Message( 'twocolconflict-test-conflict-hint' ) )->parse(),
+			$this->msg( 'twocolconflict-test-conflict-hint' )->parse(),
 			'mw-twocolconflict-test-conflict-hint'
 		);
 
@@ -159,22 +152,13 @@ class SpecialConflictTestPage extends SpecialPage {
 
 	private function showConflict( Article $article ) {
 		$editConflictHelperFactory = function ( $submitButtonLabel ) use ( $article ) {
-			if ( $this->config->get( 'TwoColConflictUseInline' ) ) {
-				return new InlineTwoColConflictTestHelper(
-					$article->getTitle(),
-					$article->getContext()->getOutput(),
-					MediaWikiServices::getInstance()->getStatsdDataFactory(),
-					$submitButtonLabel
-				);
-			} else {
-				return new SplitTwoColConflictTestHelper(
-					$article->getTitle(),
-					$article->getContext()->getOutput(),
-					MediaWikiServices::getInstance()->getStatsdDataFactory(),
-					$submitButtonLabel,
-					''
-				);
-			}
+			return new SplitTwoColConflictTestHelper(
+				$article->getTitle(),
+				$article->getContext()->getOutput(),
+				MediaWikiServices::getInstance()->getStatsdDataFactory(),
+				$submitButtonLabel,
+				''
+			);
 		};
 
 		( new TwoColConflictTestEditPage(
@@ -184,7 +168,7 @@ class SpecialConflictTestPage extends SpecialPage {
 		) )->edit();
 
 		// overwrite title set by EditPage
-		$this->getOutput()->setPageTitle( new Message( 'twocolconflict-test-page-title' ) );
+		$this->getOutput()->setPageTitle( $this->msg( 'twocolconflict-test-page-title' ) );
 	}
 
 	/**

@@ -1,23 +1,23 @@
 var assert = require( 'assert' ),
 	EditConflictPage = require( '../pageobjects/editconflict.page' ),
-	Api = require( 'wdio-mediawiki/Api' ),
 	Util = require( 'wdio-mediawiki/Util' );
 
 describe( 'TwoColConflict', function () {
-	var conflictUser,
+	let conflictUser,
 		conflictUserPassword;
 
 	before( function () {
 		conflictUser = Util.getTestString( 'User-' );
 		conflictUserPassword = Util.getTestString();
-		browser.call( function () {
-			Api.createAccount( conflictUser, conflictUserPassword );
-		} );
-		EditConflictPage.prepareEditConflict();
+		EditConflictPage.prepareEditConflict( conflictUser, conflictUserPassword );
 	} );
 
 	beforeEach( function () {
 		EditConflictPage.showSimpleConflict( conflictUser, conflictUserPassword );
+
+		assert( EditConflictPage.submitButton.isVisible(), 'submit button exists' );
+		assert( EditConflictPage.previewButton.isVisible(), 'preview button exists' );
+		assert( !EditConflictPage.diffButton.isVisible(), 'no diff button' );
 	} );
 
 	it( 'has edit buttons that toggle availability depending on side selection', function () {
@@ -147,7 +147,7 @@ describe( 'TwoColConflict', function () {
 	} );
 
 	it( 'edits of unchanged paragraphs should be saved', function () {
-		let unchangedParagraphNewText = 'Dummy Text';
+		const unchangedParagraphNewText = 'Dummy Text';
 
 		EditConflictPage.getEditButton( 'unchanged' ).click();
 		EditConflictPage.getEditor( 'unchanged' ).setValue( unchangedParagraphNewText );
@@ -167,7 +167,7 @@ describe( 'TwoColConflict', function () {
 	} );
 
 	it( 'edits of selected paragraphs should be saved and should not affect unselected paragraphs', function () {
-		let yourParagraphDiffText = EditConflictPage.getDiffText( 'your' ).getText(),
+		const yourParagraphDiffText = EditConflictPage.getDiffText( 'your' ).getText(),
 			yourParagraphEditorText = EditConflictPage.getEditor( 'your' ).getValue(),
 			otherParagraphNewText = 'Dummy Text';
 
@@ -201,7 +201,8 @@ describe( 'TwoColConflict', function () {
 	} );
 
 	it( 'paragraph edits can be reverted', function () {
-		let otherParagraphOriginalDiffText = EditConflictPage.getDiffText( 'other' ).getHTML();
+		const otherParagraphOriginalDiffText = EditConflictPage.getDiffText( 'other' ).getHTML(),
+			otherParagraphOriginalText = EditConflictPage.getEditor( 'other' ).getValue();
 
 		EditConflictPage.getEditButton( 'other' ).click();
 		EditConflictPage.getEditor( 'other' ).setValue( 'Dummy Edit #1' );
@@ -222,6 +223,12 @@ describe( 'TwoColConflict', function () {
 			otherParagraphOriginalDiffText,
 			'edited text was reverted successfully while preserving the formatting'
 		);
+
+		assert.strictEqual(
+			EditConflictPage.getEditor( 'other' ).getValue(),
+			otherParagraphOriginalText,
+			'plain text in editor was reverted successfully'
+		);
 	} );
 
 	it( 'clicking edit should automatically focus the text editor', function () {
@@ -232,9 +239,47 @@ describe( 'TwoColConflict', function () {
 		);
 	} );
 
+	it( 'hovering over a disabled edit button should display a popup for that button only', function () {
+		EditConflictPage.hoverEditButton( 'your' );
+		assert(
+			EditConflictPage.getEditDisabledEditButtonPopup( 'your' ).isVisible(),
+			'popup is now visible for the disabled edit button'
+		);
+		assert(
+			!EditConflictPage.getEditDisabledEditButtonPopup( 'other' ).isVisible(),
+			'popup is still hidden for the enabled edit button'
+		);
+	} );
+
+	it( 'hovering away from a disabled edit button should hide the popup', function () {
+		EditConflictPage.hoverEditButton( 'your' );
+		assert(
+			EditConflictPage.getEditDisabledEditButtonPopup( 'your' ).isVisible(),
+			'popup is now visible for the disabled edit button'
+		);
+
+		EditConflictPage.hoverEditButton( 'other' );
+		assert(
+			!EditConflictPage.getEditDisabledEditButtonPopup( 'your' ).isVisible(),
+			'popup is now hidden for the disabled edit button'
+		);
+	} );
+
+	it( 'hovering over an enabled edit button should not display a popup', function () {
+		EditConflictPage.hoverEditButton( 'other' );
+		assert(
+			!EditConflictPage.getEditDisabledEditButtonPopup( 'your' ).isVisible(),
+			'edit button popup is not visible'
+		);
+		assert(
+			!EditConflictPage.getEditDisabledEditButtonPopup( 'other' ).isVisible(),
+			'edit button popup is not visible'
+		);
+	} );
+
 	afterEach( function () {
 		// provoke and dismiss reload warning
-		browser.url( 'data:' );
+		browser.url( 'data:text/html,Done' );
 		try {
 			browser.alertAccept();
 		} catch ( e ) {}

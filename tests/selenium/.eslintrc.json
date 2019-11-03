@@ -1,14 +1,16 @@
 {
-	"extends": "wikimedia",
+	"root": true,
+	"extends": [
+		"wikimedia/server"
+	],
 	"env": {
-		"es6": true,
-		"mocha": true,
-		"node": true
+		"mocha": true
 	},
 	"globals": {
 		"browser": false
 	},
 	"rules": {
-		"no-console": 0
+		"no-console": "off",
+		"prefer-template": "off"
 	}
 }

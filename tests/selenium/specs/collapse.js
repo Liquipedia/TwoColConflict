@@ -1,19 +1,15 @@
 var assert = require( 'assert' ),
 	EditConflictPage = require( '../pageobjects/editconflict.page' ),
-	Api = require( 'wdio-mediawiki/Api' ),
 	Util = require( 'wdio-mediawiki/Util' );
 
 describe( 'TwoColConflict', function () {
-	var conflictUser,
+	let conflictUser,
 		conflictUserPassword;
 
 	before( function () {
 		conflictUser = Util.getTestString( 'User-' );
 		conflictUserPassword = Util.getTestString();
-		browser.call( function () {
-			Api.createAccount( conflictUser, conflictUserPassword );
-		} );
-		EditConflictPage.prepareEditConflict();
+		EditConflictPage.prepareEditConflict( conflictUser, conflictUserPassword );
 	} );
 
 	beforeEach( function () {
@@ -69,7 +65,7 @@ describe( 'TwoColConflict', function () {
 	} );
 
 	it( 'expands edited collapsed paragraphs and allows re-collapsing', function () {
-		let unchangedParagraphNewText = 'Dummy Text';
+		const unchangedParagraphNewText = 'Dummy Text';
 
 		EditConflictPage.getEditButton( 'unchanged' ).click();
 		EditConflictPage.getEditor( 'unchanged' ).setValue( unchangedParagraphNewText );
@@ -138,7 +134,7 @@ describe( 'TwoColConflict', function () {
 
 	afterEach( function () {
 		// provoke and dismiss reload warning
-		browser.url( 'data:' );
+		browser.url( 'data:text/html,Done' );
 		try {
 			browser.alertAccept();
 		} catch ( e ) {}
